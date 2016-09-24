@@ -8,8 +8,9 @@ const version = (
 );
 
 const symbol = (name, def) => {
-  sym = global[name];
-  if (!sym) global[name] = sym = Symbol(name);
+  let sym = global[name];
+  // if (sym && sym.constructor !== Symbol) console.log('already defined:', name);
+  if (!sym || sym.constructor !== Symbol) global[name] = sym = Symbol(name);
   const objproto = Object.prototype;
 
   if (!objproto[sym] || symbol.newVersion) {

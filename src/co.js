@@ -10,12 +10,26 @@ const echoGenerator = function* echoGenerator(arg) {
 };
 
 symbol.globalDef('ctorObject', ({}).constructor);
+symbol.globalDef('ctorArray', [].constructor);
 symbol.globalDef('ctorFunction', echoFunction.constructor);
 symbol.globalDef('ctorGenerator', echoGenerator.constructor);
 symbol.globalDef('ctorIterator', echoGenerator().constructor);
+symbol.globalDef('ctorSymbol', Symbol);
 
 symbol('current', null);
 symbol('status', null);
+
+symbol('args', function args(...arg) {
+  if (!this[status]) this[status] = {context: this};
+  this[status].args = arg;
+  return this;
+});
+
+symbol('context', function context(arg) {
+  if (!this[status]) this[status] = {args: []};
+  this[status].context = arg || this[status].originalContext || global;
+  return this;
+});
 
 symbol('halt', function halt(reason) {
   const sta = this[status];
@@ -32,45 +46,95 @@ symbol.globalDef('isPromise', obj => (
   obj.constructor !== ctorObject
 ));
 
-symbol.globalDef('coLaunch', function coLaunch(generator, ...args) {
-  let value = generator;
-  let ctor = value && value.constructor;
-  if (ctor === ctorFunction || ctor === ctorGenerator) value = value.apply(this, args);
-  ctor = value && value.constructor;
+const coLaunchObject = function* coLaunchObject(obj, ...args) {
+  const result = {};
+
+  for (const i in obj) { // eslint-disable-line
+    if (Object.hasOwnProperty.call(obj, i)) {
+      const v = obj[i];
+      result[i] = v && v.constructor === ctorIterator ? yield* v : yield co.call(this, v, ...args);
+    }
+  }
+
+  return result;
+};
+
+const coLaunchArray = function* coLaunchArray(obj, ...args) {
+  const result = [];
+
+  for (const v of obj) {
+    result.push(v && v.constructor === ctorIterator ? yield* v : yield co.call(this, v, ...args));
+  }
+
+  return result;
+};
+
+const coLaunchCall = function coLaunchCall(value, ...args) {
+  const ctor = value.constructor;
+  if (ctor === ctorFunction || ctor === ctorGenerator) return value.apply(this, args);
+  else if (ctor === ctorArray) return coLaunchArray.call(this, value, ...args);
+  else if (ctor === ctorObject) return coLaunchObject.call(this, value, ...args);
+  return value;
+};
+
+const coLaunch = function coLaunch(generator, ...args) {
+  const value = generator && coLaunchCall.call(this, generator, ...args);
+  if (!value) return {promise: Promise.resolve(value)};
+  const ctor = value.constructor;
   if (ctor === ctorIterator) return {iterator: value};
   if (value instanceof Promise) return {promise: value};
   return {promise: Promise.resolve(value)};
-});
+};
 
-symbol.globalDef('coNextGenerator', function coNextGenerator(value, continuers) {
+const coNextSymbol = function coNextSymbol(value, continuers) {
+  if (value === status) return continuers.status;
+  return value;
+};
+
+const coGetStatus = function coGetStatus(value, continuers) {
+  let sta = value && value[status];
+  if (!sta) sta = continuers.status;
+  return sta;
+};
+
+const coNextCall = function coNextCall(value, status) {
   const ctor = value.constructor;
-  if (ctor === ctorGenerator) return co(value.call(continuers.context));
-  if (ctor === ctorIterator) return co(value);
-});
+  const context = status.context;
+  const args = status.args;
+  if (ctor === ctorFunction) return value.call(context, ...args);
+  if (ctor === ctorArray) return coLaunchArray.call(context, value, ...args);
+  if (ctor === ctorObject) return coLaunchObject.call(context, value, ...args);
+  if (ctor === ctorSymbol) return coNextSymbol.call(context, value, ...args);
+  return value;
+};
 
-symbol.globalDef('coNextPromise', function coNextPromise(value, continuers) {
+const coNextGenerator = function coNextGenerator(value, status) {
+  const ctor = value.constructor;
+  const context = status.context;
+  if (ctor === ctorGenerator) return co(value.call(context));
+  if (ctor === ctorIterator) return co(value);
+  return value;
+};
+
+const coNextPromise = function coNextPromise(value, continuers) {
   if (!isPromise(value)) return value;
 
   return (
     (value instanceof Promise ? value : Promise.resolve(value))
     .then(continuers.onFulfilled, continuers.onRejected)
   );
-});
+};
 
-symbol.globalDef('coNext', function coNext(iterated, continuers) {
+const coNext = function coNext(iterated, continuers) {
   if (iterated.done) return Promise.resolve(iterated.value);
   let value = iterated.value;
-
-  if (value && value.constructor === ctorFunction) {
-    value = value.call(continuers.context);
-  }
-
   if (!value) return value;
-  const nextGen = coNextGenerator(value, continuers);
-  if (nextGen) value = nextGen;
-  const nextPromise = coNextPromise(value, continuers);
-  return nextPromise;
-});
+  const sta = coGetStatus(value, continuers);
+  value = coNextCall(value, sta);
+  if (!value) return value;
+  value = coNextGenerator(value, sta);
+  return coNextPromise(value, continuers);
+};
 
 symbol.globalDef('co', function co(generator, ...args) {
   const gotIterator = coLaunch.call(this, generator, ...args);
@@ -79,13 +143,8 @@ symbol.globalDef('co', function co(generator, ...args) {
 
   // let error = new Error() [errstack](1);
   const iterator = gotIterator.iterator;
-  const myStatus = {};
-  let promise;
-
-  const context = this === global ? {} : this;
-  context[status] = myStatus;
-
-  const continuers = {context};
+  const myStatus = {args, context: this};
+  const continuers = {status: myStatus};
 
   continuers.onFulfilled = (arg) => {
     let input = arg;
@@ -105,7 +164,8 @@ symbol.globalDef('co', function co(generator, ...args) {
       }
     } while (!(input instanceof Promise));
 
-    if (promise) promise[current] = input;
+    if (!continuers.promise) continuers.promise = input;
+    continuers.promise[current] = input;
     return input;
   };
 
@@ -126,13 +186,13 @@ symbol.globalDef('co', function co(generator, ...args) {
 
     if (!(input instanceof Promise)) input = Promise.resolve(input);
 
-    if (promise) promise[current] = input;
+    continuers.promise[current] = input;
     return input;
   };
 
-  promise = continuers.onFulfilled();
-  promise[status] = myStatus;
-  return promise;
+  continuers.onFulfilled();
+  continuers.promise[status] = myStatus;
+  return continuers.promise;
 });
 
 symbol.globalDef('delay', function delay(sec) {
@@ -189,7 +249,7 @@ symbol('callbacks', function callbacks(...methods) {
       const rctx = this === dctx ? sctx : this;
       let promise;
 
-      promise = new Promise((ok, nok) => {
+      promise = new Promise((ok, nok) => { //eslint-disable-line
         let result;
 
         args.push((err, data) => {
