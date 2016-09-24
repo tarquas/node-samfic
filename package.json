@@ -1,0 +1,41 @@
+{
+  "name": "samfic",
+  "version": "0.1.0",
+  "description": "Node.js' Scalable Asynchronous Module Functional Inversion of Control",
+  "main": "index.js",
+  "scripts": {
+    "lint": "export FILES=\"index.js src test\" && node_modules/.bin/eslint $FILES && node_modules/.bin/jsinspect $FILES",
+    "test": "node_modules/.bin/mocha"
+  },
+  "engines": {
+    "node": ">=6.2.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tarquas/node-samfic.git"
+  },
+  "keywords": [
+    "scalable",
+    "asynchronous",
+    "async",
+    "amd",
+    "functional",
+    "ioc",
+    "framework",
+    "helper"
+  ],
+  "author": "Taras Mykhailovych",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tarquas/node-samfic/issues"
+  },
+  "homepage": "https://github.com/tarquas/node-samfic#readme",
+  "devDependencies": {
+    "chai": "3.5.0",
+    "eslint": "3.5.0",
+    "eslint-config-airbnb-base": "7.1.0",
+    "eslint-plugin-import": "1.16.0",
+    "jsinspect": "0.8.0",
+    "mocha": "3.0.2"
+  }
+}

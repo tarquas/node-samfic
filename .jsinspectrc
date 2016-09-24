@@ -1,0 +1,6 @@
+{
+  "threshold":     50,
+  "identifiers":   true,
+  "ignore":        "stats-weekly-old.js|node_modules|tests",
+  "suppress":      100
+}
