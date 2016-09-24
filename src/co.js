@@ -1,3 +1,5 @@
+const Co = module.exports;
+
 const symbol = require('./symbol');
 
 const echoFunction = function echoFunction(arg) {
@@ -9,12 +11,12 @@ const echoGenerator = function* echoGenerator(arg) {
   return arg;
 };
 
-symbol.globalDef('ctorObject', ({}).constructor);
-symbol.globalDef('ctorArray', [].constructor);
-symbol.globalDef('ctorFunction', echoFunction.constructor);
-symbol.globalDef('ctorGenerator', echoGenerator.constructor);
-symbol.globalDef('ctorIterator', echoGenerator().constructor);
-symbol.globalDef('ctorSymbol', Symbol);
+Co.ctorObject = ({}).constructor;
+Co.ctorArray = [].constructor;
+Co.ctorFunction = echoFunction.constructor;
+Co.ctorGenerator = echoGenerator.constructor;
+Co.ctorIterator = echoGenerator().constructor;
+Co.ctorSymbol = Symbol;
 
 symbol('current', null);
 symbol('status', null);
@@ -37,13 +39,14 @@ symbol('halt', function halt(reason) {
   sta.halted = reason || 'halted';
   const cur = this[current];
   if (cur) cur[halt](reason);
+  return true;
 });
 
 symbol.globalDef('isPromise', obj => (
   obj &&
   obj.then &&
   obj.catch &&
-  obj.constructor !== ctorObject
+  obj.constructor !== Co.ctorObject
 ));
 
 const coLaunchObject = function* coLaunchObject(obj, ...args) {
@@ -52,7 +55,12 @@ const coLaunchObject = function* coLaunchObject(obj, ...args) {
   for (const i in obj) { // eslint-disable-line
     if (Object.hasOwnProperty.call(obj, i)) {
       const v = obj[i];
-      result[i] = v && v.constructor === ctorIterator ? yield* v : yield co.call(this, v, ...args);
+
+      result[i] = (
+        v && v.constructor === Co.ctorIterator ?
+        yield* v :
+        yield co.call(this, v, ...args)
+      );
     }
   }
 
@@ -63,7 +71,11 @@ const coLaunchArray = function* coLaunchArray(obj, ...args) {
   const result = [];
 
   for (const v of obj) {
-    result.push(v && v.constructor === ctorIterator ? yield* v : yield co.call(this, v, ...args));
+    result.push(
+      v && v.constructor === Co.ctorIterator ?
+      yield* v :
+      yield co.call(this, v, ...args)
+    );
   }
 
   return result;
@@ -71,9 +83,9 @@ const coLaunchArray = function* coLaunchArray(obj, ...args) {
 
 const coLaunchCall = function coLaunchCall(value, ...args) {
   const ctor = value.constructor;
-  if (ctor === ctorFunction || ctor === ctorGenerator) return value.apply(this, args);
-  else if (ctor === ctorArray) return coLaunchArray.call(this, value, ...args);
-  else if (ctor === ctorObject) return coLaunchObject.call(this, value, ...args);
+  if (ctor === Co.ctorFunction || ctor === Co.ctorGenerator) return value.apply(this, args);
+  else if (ctor === Co.ctorArray) return coLaunchArray.call(this, value, ...args);
+  else if (ctor === Co.ctorObject) return coLaunchObject.call(this, value, ...args);
   return value;
 };
 
@@ -81,7 +93,7 @@ const coLaunch = function coLaunch(generator, ...args) {
   const value = generator && coLaunchCall.call(this, generator, ...args);
   if (!value) return {promise: Promise.resolve(value)};
   const ctor = value.constructor;
-  if (ctor === ctorIterator) return {iterator: value};
+  if (ctor === Co.ctorIterator) return {iterator: value};
   if (value instanceof Promise) return {promise: value};
   return {promise: Promise.resolve(value)};
 };
@@ -101,18 +113,18 @@ const coNextCall = function coNextCall(value, status) {
   const ctor = value.constructor;
   const context = status.context;
   const args = status.args;
-  if (ctor === ctorFunction) return value.call(context, ...args);
-  if (ctor === ctorArray) return coLaunchArray.call(context, value, ...args);
-  if (ctor === ctorObject) return coLaunchObject.call(context, value, ...args);
-  if (ctor === ctorSymbol) return coNextSymbol.call(context, value, ...args);
+  if (ctor === Co.ctorFunction) return value.call(context, ...args);
+  if (ctor === Co.ctorArray) return coLaunchArray.call(context, value, ...args);
+  if (ctor === Co.ctorObject) return coLaunchObject.call(context, value, ...args);
+  if (ctor === Co.ctorSymbol) return coNextSymbol.call(context, value, ...args);
   return value;
 };
 
 const coNextGenerator = function coNextGenerator(value, status) {
   const ctor = value.constructor;
   const context = status.context;
-  if (ctor === ctorGenerator) return co(value.call(context));
-  if (ctor === ctorIterator) return co(value);
+  if (ctor === Co.ctorGenerator) return co(value.call(context));
+  if (ctor === Co.ctorIterator) return co(value);
   return value;
 };
 

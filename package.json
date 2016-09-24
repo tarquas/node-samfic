@@ -4,8 +4,10 @@
   "description": "Node.js' Scalable Asynchronous Module Functional Inversion of Control",
   "main": "index.js",
   "scripts": {
+    "test": "node_modules/.bin/mocha",
+    "test-report": "node_modules/.bin/mocha --reporter mochawesome --reporter-options \"reportDir=test-report,reportName=index,reportTitle=SAMFIC Test Report,inlineAssets=true\"",
     "lint": "export FILES=\"index.js src test\" && node_modules/.bin/eslint $FILES && node_modules/.bin/jsinspect $FILES",
-    "test": "node_modules/.bin/mocha"
+    "coverage": "node_modules/.bin/istanbul cover node_modules/.bin/_mocha"
   },
   "engines": {
     "node": ">=6.2.2"
@@ -35,7 +37,9 @@
     "eslint": "3.5.0",
     "eslint-config-airbnb-base": "7.1.0",
     "eslint-plugin-import": "1.16.0",
+    "istanbul": "^0.4.5",
     "jsinspect": "0.8.0",
-    "mocha": "3.0.2"
+    "mocha": "3.0.2",
+    "mochawesome": "^1.5.2"
   }
 }

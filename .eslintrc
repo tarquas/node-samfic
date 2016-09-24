@@ -11,36 +11,28 @@
     "no-plusplus": "off",
     "no-underscore-dangle": "off",
     "prefer-arrow-callback": "off",
-    "consistent-return": "off",
     "comma-dangle": "off",
     "object-curly-spacing": "off",
-    "strict": "off",
     "require-yield": "off",
     "no-whitespace-before-property": "off",
     "no-param-reassign": ["error", { "props": false }],
     "no-unexpected-multiline": "off",
     "no-throw-literal": "off",
-    "import/no-extraneous-dependencies": ["error", {"devDependencies": true}],
-
-    "prefer-rest-params": "off",
-    "prefer-spread": "off"
+    "import/no-extraneous-dependencies": ["error", {"devDependencies": true}]
   },
   "globals": {
+    "all": true,
     "args": true,
+    "batch": true,
     "callbacks": true,
     "co": true,
     "context": true,
-    "ctorArray": true,
-    "ctorFunction": true,
-    "ctorGenerator": true,
-    "ctorIterator": true,
-    "ctorObject": true,
-    "ctorSymbol": true,
     "current": true,
     "delay": true,
     "halt": true,
     "isPromise": true,
     "samficVersion": true,
-    "status": true
+    "status": true,
+    "tube": true
   }
 }

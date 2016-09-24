@@ -113,6 +113,8 @@ CoTest.launchContext = function* launchContext(input) {
   return this + input;
 };
 
+CoTest.context = context;
+
 CoTest.waitForObjectCustom = function* waitForObjectCustom() {
   const result = yield ({
     ofGenerator: CoTest.launchGenerator,
@@ -121,7 +123,7 @@ CoTest.waitForObjectCustom = function* waitForObjectCustom() {
     ofPromise: Promise.resolve(81),
     ofValue: 82,
     ofFalsyValue: undefined
-  }) [args](1, 2) [context](3);
+  }) [args](1, 2) [CoTest.context](3);
 
   chai.expect(result).to.deep.equal({
     ofGenerator: 3,
@@ -143,7 +145,7 @@ CoTest.waitForArrayCustom = function* waitForArrayCustom() {
     Promise.resolve(83),
     84,
     undefined
-  ] [args](1, 2) [context](3);
+  ] [args](1, 2) [CoTest.context](3);
 
   chai.expect(result).to.deep.equal([3, 4, 2, 83, 84, undefined]);
   return result;
