@@ -48,25 +48,25 @@ FunnelTest.resultsTestObject = {
 FunnelTest.allArray = function* allArray() {
   const startAt = process.uptime();
   const results = yield* FunnelTest.getTestArray() [all]();
-  const duration = Math.round((process.uptime() - startAt) * 25) * 4;
+  const duration = Math.floor((process.uptime() - startAt) * 25) * 4;
   chai.expect(results).to.deep.equal(FunnelTest.resultsTestArray);
-  chai.expect(duration).to.equal(8);
+  chai.expect(duration).to.equal(4);
   return duration;
 };
 
 FunnelTest.allObject = function* allObject() {
   const startAt = process.uptime();
   const results = yield* FunnelTest.getTestObject() [all]();
-  const duration = Math.round((process.uptime() - startAt) * 25) * 4;
+  const duration = Math.floor((process.uptime() - startAt) * 25) * 4;
   chai.expect(results).to.deep.equal(FunnelTest.resultsTestObject);
-  chai.expect(duration).to.equal(8);
+  chai.expect(duration).to.equal(4);
   return duration;
 };
 
 FunnelTest.tubeArray = function* tubeArray() {
   const startAt = process.uptime();
   const results = yield* FunnelTest.getTestArray() [tube](2);
-  const duration = Math.round((process.uptime() - startAt) * 25) * 4;
+  const duration = Math.floor((process.uptime() - startAt) * 25) * 4;
   chai.expect(results).to.deep.equal(FunnelTest.resultsTestArray);
   chai.expect(duration).to.equal(12);
   return duration;
@@ -75,7 +75,7 @@ FunnelTest.tubeArray = function* tubeArray() {
 FunnelTest.tubeObject = function* tubeObject() {
   const startAt = process.uptime();
   const results = yield* FunnelTest.getTestObject() [tube](2);
-  const duration = Math.round((process.uptime() - startAt) * 25) * 4;
+  const duration = Math.floor((process.uptime() - startAt) * 25) * 4;
   chai.expect(results).to.deep.equal(FunnelTest.resultsTestObject);
   chai.expect(duration).to.equal(12);
   return duration;
@@ -84,7 +84,7 @@ FunnelTest.tubeObject = function* tubeObject() {
 FunnelTest.batchArray = function* batchArray() {
   const startAt = process.uptime();
   const results = yield* FunnelTest.getTestArray() [batch](3);
-  const duration = Math.round((process.uptime() - startAt) * 25) * 4;
+  const duration = Math.floor((process.uptime() - startAt) * 25) * 4;
   chai.expect(results).to.deep.equal(FunnelTest.resultsTestArray);
   chai.expect(duration).to.equal(8);
   return duration;
@@ -93,7 +93,7 @@ FunnelTest.batchArray = function* batchArray() {
 FunnelTest.batchObject = function* batchObject() {
   const startAt = process.uptime();
   const results = yield* FunnelTest.getTestObject() [batch](3);
-  const duration = Math.round((process.uptime() - startAt) * 25) * 4;
+  const duration = Math.floor((process.uptime() - startAt) * 25) * 4;
   chai.expect(results).to.deep.equal(FunnelTest.resultsTestObject);
   chai.expect(duration).to.equal(8);
   return duration;
