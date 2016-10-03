@@ -37,9 +37,10 @@
     "eslint": "3.5.0",
     "eslint-config-airbnb-base": "7.1.0",
     "eslint-plugin-import": "1.16.0",
-    "istanbul": "^0.4.5",
+    "esprima": "3.0.0",
+    "istanbul": "0.4.5",
     "jsinspect": "0.8.0",
     "mocha": "3.0.2",
-    "mochawesome": "^1.5.2"
+    "mochawesome": "1.5.2"
   }
 }

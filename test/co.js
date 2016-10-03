@@ -211,7 +211,7 @@ CoTest.waitForFastArrayHalt = function* waitForFastArrayHalt() {
 
       function* step2() {
         sum += 2;
-        promise[halt]('halt test');
+        promise[halt]();
       },
 
       function* step3() {
@@ -224,7 +224,7 @@ CoTest.waitForFastArrayHalt = function* waitForFastArrayHalt() {
     yield promise;
     throw 'promise succeeded';
   } catch (err) {
-    chai.expect(err).to.equal('halt test');
+    chai.expect(err).to.equal('halted');
   }
 
   chai.expect(sum).to.equal(3);

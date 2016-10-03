@@ -27,7 +27,7 @@ Funnel.wrapObject = function* wrapObject(arrayFunnel, values, ...args) {
 };
 
 Funnel.wrapCall = function* wrapCall(arrayFunnel, values, ...args) {
-  const sta = values[status];
+  const sta = values[Co.status];
   const passArgs = !sta ? args : args.concat(sta.args);
   const context = (sta && sta.context) || this;
   const ctor = values.constructor;
@@ -42,15 +42,15 @@ Funnel.wrapCall = function* wrapCall(arrayFunnel, values, ...args) {
 
 Funnel.allArray = function* allArray(values, ...args) {
   if (!values.length) return [];
-  const promises = values.map(value => co.call(this, value, ...args));
+  const promises = values.map(value => Co.co.call(this, value, ...args));
   const promise = Promise.all(promises);
-  promise[status] = promises.map(item => item[status]);
-  promise[halt] = reason => promises.map(item => item [halt](reason));
+  promise[Co.status] = promises.map(item => item[Co.status]);
+  promise[Co.halt] = reason => promises.map(item => item [Co.halt](reason));
   const results = yield promise;
   return results;
 };
 
-symbol('all', function* all(...args) {
+Funnel.all = symbol('all', function* all(...args) {
   const values = this;
   const result = yield* Funnel.wrapCall(Funnel.allArray, values, ...args);
   return result;
@@ -68,37 +68,37 @@ Funnel.tubeArray = function* tubeArray(values, simCount, ...args) {
   if (!values.length) return [];
   const count = Funnel.getCount(values, simCount);
   const mapped = new Array(count).fill(1).map((v, k) => k);
-  const promises = values.slice(0, count).map(value => co.call(this, value, ...args));
+  const promises = values.slice(0, count).map(value => Co.co.call(this, value, ...args));
   const race = promises.map(Funnel.indexedResult);
   const myStatus = {tube: {count}};
   const results = [];
 
   promises.forEach((promise) => {
-    if (promise[status]) promise[status].tube = myStatus.tube;
+    if (promise[Co.status]) promise[Co.status].tube = myStatus.tube;
   });
 
-  const haltFunc = reason => promises.map(item => item [halt](reason));
+  const haltFunc = reason => promises.map(item => item [Co.halt](reason));
 
   for (let next = count; next <= values.length; next++) {
     const promise = Promise.race(race);
-    promise[status] = myStatus;
-    promise[halt] = haltFunc;
+    promise[Co.status] = myStatus;
+    promise[Co.halt] = haltFunc;
     const done = yield promise;
     const index = done.index;
     results[mapped[index]] = done.result;
 
     if (next < values.length) {
       mapped[index] = next;
-      const nextPromise = co.call(this, values[next], ...args);
+      const nextPromise = Co.co.call(this, values[next], ...args);
       promises[index] = nextPromise;
       race[index] = Funnel.indexedResult(nextPromise, index);
-      nextPromise[status].tube = myStatus.tube;
+      nextPromise[Co.status].tube = myStatus.tube;
     }
   }
 
   const lastPromise = Promise.all(promises);
-  lastPromise[status] = myStatus;
-  lastPromise[halt] = haltFunc;
+  lastPromise[Co.status] = myStatus;
+  lastPromise[Co.halt] = haltFunc;
   const lastResults = yield lastPromise;
 
   lastResults.forEach((result, index) => {
@@ -108,7 +108,7 @@ Funnel.tubeArray = function* tubeArray(values, simCount, ...args) {
   return results;
 };
 
-symbol('tube', function* tube(count, ...args) {
+Funnel.tube = symbol('tube', function* tube(count, ...args) {
   const values = this;
   const result = yield* Funnel.wrapCall(Funnel.tubeArray, values, count, ...args);
   return result;
@@ -122,22 +122,22 @@ Funnel.batchArray = function* batchArray(values, simCount, ...args) {
   const results = [];
 
   const assignStatus = (promise) => {
-    if (promise[status]) promise[status].batch = myStatus.batch;
+    if (promise[Co.status]) promise[Co.status].batch = myStatus.batch;
   };
 
-  const haltFunc = reason => promises.map(item => item [halt](reason));
+  const haltFunc = reason => promises.map(item => item [Co.halt](reason));
 
   for (let offset = 0; offset < values.length; offset += count) {
     promises = (
       values.slice(offset, count + offset)
-      .map(value => co.call(this, value, ...args))
+      .map(value => Co.co.call(this, value, ...args))
     );
 
     promises.forEach(assignStatus);
 
     const promise = Promise.all(promises);
-    promise[status] = myStatus;
-    promise[halt] = haltFunc;
+    promise[Co.status] = myStatus;
+    promise[Co.halt] = haltFunc;
     const done = yield promise;
     results.push(...done);
   }
@@ -145,7 +145,7 @@ Funnel.batchArray = function* batchArray(values, simCount, ...args) {
   return results;
 };
 
-symbol('batch', function* batch(count, ...args) {
+Funnel.batch = symbol('batch', function* batch(count, ...args) {
   const values = this;
   const result = yield* Funnel.wrapCall(Funnel.batchArray, values, count, ...args);
   return result;

@@ -12,22 +12,13 @@ const symbol = (name, def) => {
   // if (sym && sym.constructor !== Symbol) console.log('already defined:', name);
   if (!sym || sym.constructor !== Symbol) global[name] = sym = Symbol(name);
   const objproto = Object.prototype;
-
-  if (!objproto[sym] || symbol.newVersion) {
-    objproto[sym] = def;
-    return true;
-  }
-
-  return false;
+  if (!objproto[sym] || symbol.newVersion) objproto[sym] = def;
+  return sym;
 };
 
 symbol.globalDef = (name, def) => {
-  if (!global[name] || symbol.newVersion) {
-    global[name] = def;
-    return true;
-  }
-
-  return false;
+  if (!global[name] || symbol.newVersion) global[name] = def;
+  return def;
 };
 
 symbol.newVersion = global.samficVersion && version > samficVersion;

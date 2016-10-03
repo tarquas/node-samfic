@@ -2,6 +2,8 @@ const Co = module.exports;
 
 const symbol = require('./symbol');
 
+/* eslint complexity: ['error', 9] */
+
 const echoFunction = function echoFunction(arg) {
   const result = arg;
   return result;
@@ -11,38 +13,46 @@ const echoGenerator = function* echoGenerator(arg) {
   return arg;
 };
 
+Co.isAnyFunction = Symbol('isAnyFunction');
+Co.isPrimitive = Symbol('isPrimitive');
 Co.ctorObject = ({}).constructor;
 Co.ctorArray = [].constructor;
 Co.ctorFunction = echoFunction.constructor;
 Co.ctorGenerator = echoGenerator.constructor;
 Co.ctorIterator = echoGenerator().constructor;
 Co.ctorSymbol = Symbol;
+Co.ctorFunction[Co.isAnyFunction] = true;
+Co.ctorGenerator[Co.isAnyFunction] = true;
+Boolean[Co.isPrimitive] = true;
+Number[Co.isPrimitive] = true;
+String[Co.isPrimitive] = true;
+Date[Co.isPrimitive] = true;
 
-symbol('current', null);
-symbol('status', null);
+Co.current = symbol('current', null);
+Co.status = symbol('status', null);
 
-symbol('args', function args(...arg) {
-  if (!this[status]) this[status] = {context: this};
-  this[status].args = arg;
+Co.args = symbol('args', function args(...arg) {
+  if (!this[Co.status]) this[Co.status] = {context: this};
+  this[Co.status].args = arg;
   return this;
 });
 
-symbol('context', function context(arg) {
-  if (!this[status]) this[status] = {args: []};
-  this[status].context = arg || this[status].originalContext || global;
+Co.context = symbol('context', function context(arg) {
+  if (!this[Co.status]) this[Co.status] = {args: []};
+  this[Co.status].context = arg || this[Co.status].originalContext || global;
   return this;
 });
 
-symbol('halt', function halt(reason) {
-  const sta = this[status];
+Co.halt = symbol('halt', function halt(reason) {
+  const sta = this[Co.status];
   if (!sta) return false;
   sta.halted = reason || 'halted';
-  const cur = this[current];
-  if (cur) cur[halt](reason);
+  const cur = this[Co.current];
+  if (cur) cur[Co.halt](reason);
   return true;
 });
 
-symbol.globalDef('isPromise', obj => (
+Co.isPromise = symbol.globalDef('isPromise', obj => (
   obj &&
   obj.then &&
   obj.catch &&
@@ -104,12 +114,14 @@ const coNextSymbol = function coNextSymbol(value, continuers) {
 };
 
 const coGetStatus = function coGetStatus(value, continuers) {
-  let sta = value && value[status];
+  let sta = value && value[Co.status];
   if (!sta) sta = continuers.status;
   return sta;
 };
 
-const coNextCall = function coNextCall(value, status) {
+const coNext = function coNext(value, continuers) {
+  if (!value) return value;
+  const status = coGetStatus(value, continuers);
   const ctor = value.constructor;
   const context = status.context;
   const args = status.args;
@@ -117,38 +129,12 @@ const coNextCall = function coNextCall(value, status) {
   if (ctor === Co.ctorArray) return coLaunchArray.call(context, value, ...args);
   if (ctor === Co.ctorObject) return coLaunchObject.call(context, value, ...args);
   if (ctor === Co.ctorSymbol) return coNextSymbol.call(context, value, ...args);
+  if (ctor === Co.ctorGenerator) return Co.co(value.call(context));
+  if (ctor === Co.ctorIterator) return Co.co(value);
   return value;
 };
 
-const coNextGenerator = function coNextGenerator(value, status) {
-  const ctor = value.constructor;
-  const context = status.context;
-  if (ctor === Co.ctorGenerator) return co(value.call(context));
-  if (ctor === Co.ctorIterator) return co(value);
-  return value;
-};
-
-const coNextPromise = function coNextPromise(value, continuers) {
-  if (!isPromise(value)) return value;
-
-  return (
-    (value instanceof Promise ? value : Promise.resolve(value))
-    .then(continuers.onFulfilled, continuers.onRejected)
-  );
-};
-
-const coNext = function coNext(iterated, continuers) {
-  if (iterated.done) return Promise.resolve(iterated.value);
-  let value = iterated.value;
-  if (!value) return value;
-  const sta = coGetStatus(value, continuers);
-  value = coNextCall(value, sta);
-  if (!value) return value;
-  value = coNextGenerator(value, sta);
-  return coNextPromise(value, continuers);
-};
-
-symbol.globalDef('co', function co(generator, ...args) {
+Co.co = symbol.globalDef('co', function co(generator, ...args) {
   const gotIterator = coLaunch.call(this, generator, ...args);
 
   if (gotIterator.promise) return gotIterator.promise;
@@ -159,55 +145,91 @@ symbol.globalDef('co', function co(generator, ...args) {
   const continuers = {status: myStatus};
 
   continuers.onFulfilled = (arg) => {
+    const halted = myStatus.halted;
     let input = arg;
+    let result;
 
-    do {
-      const halted = myStatus.halted;
+    if (halted) {
+      // error.message = halted;
+      input = Promise.reject(halted);
+    } else {
+      yieldBlock: try { // eslint-disable-line
+        yieldLoop: while (true) { // eslint-disable-line
+          result = iterator.next(input);
 
-      if (halted) {
-        // error.message = halted;
-        return Promise.reject(halted);
-      }
+          if (result.done) {
+            input = Promise.resolve(result.value);
+            break yieldBlock; // eslint-disable-line
+          }
 
-      try {
-        input = coNext(iterator.next(input), continuers);
+          input = result.value;
+
+          checkLoop: while (true) { // eslint-disable-line
+            if (!input || input.constructor[Co.isPrimitive]) continue yieldLoop; // eslint-disable-line
+
+            if (input.constructor === Promise) {
+              input = input.then(continuers.onFulfilled, continuers.onRejected);
+              break yieldBlock; // eslint-disable-line
+            }
+
+            input = coNext(input, continuers);
+          }
+        }
       } catch (err) {
         input = Promise.reject(err);
       }
-    } while (!(input instanceof Promise));
+    }
 
-    if (!continuers.promise) continuers.promise = input;
-    continuers.promise[current] = input;
+    continuers.promise[Co.current] = input;
     return input;
   };
 
   continuers.onRejected = (arg) => {
     let input = arg;
+    let result;
     const halted = myStatus.halted;
 
     if (halted) {
       // error.message = halted;
-      return Promise.reject(halted);
+      input = Promise.reject(halted);
+    } else {
+      yieldBlock: try { // eslint-disable-line
+        result = iterator.throw(input);
+
+        if (result.done) {
+          input = Promise.resolve(result.value);
+          break yieldBlock; // eslint-disable-line
+        }
+
+        input = result.value;
+
+        checkLoop: while (true) { // eslint-disable-line
+          if (!input || input.constructor[Co.isPrimitive]) input = Promise.resolve(input);
+
+          if (input.constructor === Promise) {
+            input = input.then(continuers.onFulfilled, continuers.onRejected);
+            break yieldBlock; // eslint-disable-line
+          }
+
+          input = coNext(input, continuers);
+        }
+      } catch (err) {
+        input = Promise.reject(err);
+      }
     }
 
-    try {
-      input = coNext(iterator.throw(input), continuers);
-    } catch (err) {
-      input = Promise.reject(err);
-    }
-
-    if (!(input instanceof Promise)) input = Promise.resolve(input);
-
-    continuers.promise[current] = input;
+    continuers.promise[Co.current] = input;
     return input;
   };
 
-  continuers.onFulfilled();
-  continuers.promise[status] = myStatus;
+  continuers.promise = {};
+  continuers.promise = continuers.onFulfilled();
+  continuers.promise[Co.current] = continuers.promise;
+  continuers.promise[Co.status] = myStatus;
   return continuers.promise;
 });
 
-symbol.globalDef('delay', function delay(sec) {
+Co.delay = symbol.globalDef('delay', function delay(sec) {
   // let error = new Error() [errstack](1);
   let myHalt;
 
@@ -224,15 +246,15 @@ symbol.globalDef('delay', function delay(sec) {
       nok(msg || 'halted');
     };
 
-    if (promise) promise[halt] = myHalt;
+    if (promise) promise[Co.halt] = myHalt;
   });
 
-  if (myHalt) promise[halt] = myHalt;
-  promise[status] = {};
+  if (myHalt) promise[Co.halt] = myHalt;
+  promise[Co.status] = {};
   return promise;
 });
 
-symbol('callbacks', function callbacks(...methods) {
+Co.callbacks = symbol('callbacks', function callbacks(...methods) {
   const from = this;
 
   const context = function callbackWrappedContext() {
@@ -265,7 +287,7 @@ symbol('callbacks', function callbacks(...methods) {
         let result;
 
         args.push((err, data) => {
-          if (promise) promise[callbacks] = result;
+          if (promise) promise[Co.callbacks] = result;
           return err ? nok(err) : ok(data);
         });
 
