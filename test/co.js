@@ -154,7 +154,7 @@ CoTest.waitForArrayCustom = function* waitForArrayCustom() {
 CoTest.waitForDelay = function* waitForDelay() {
   const startAt = process.uptime();
   yield delay(1 / 10);
-  const duration = Math.floor((process.uptime() - startAt) * 10);
+  const duration = Math.round((process.uptime() - startAt) * 10);
   chai.expect(duration).to.equal(1);
   return duration;
 };
@@ -171,7 +171,7 @@ CoTest.wrapped = CoTest[callbacks]('callbacks.delay');
 CoTest.waitForDelayCallback = function* waitForDelayCallback() {
   const startAt = process.uptime();
   const context = yield CoTest.wrapped.callbacks.delay(1 / 10);
-  const duration = Math.floor((process.uptime() - startAt) * 10);
+  const duration = Math.round((process.uptime() - startAt) * 10);
   chai.expect(duration).to.equal(1);
   chai.expect(context).to.equal(CoTest.callbacks);
   chai.expect(CoTest.wrapped()).to.equal(CoTest);
