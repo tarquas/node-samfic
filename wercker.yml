@@ -43,3 +43,10 @@ build:
         name: coverage
         code: |
           npm run-script coverage
+
+push-release:
+  steps:
+    - heroku-deploy:
+      key: $HEROKU_KEY
+      user: $HEROKU_USER
+      app-name: $HEROKU_APP
