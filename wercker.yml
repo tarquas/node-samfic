@@ -35,14 +35,9 @@ build:
           npm run-script lint
 
     - script:
-        name: test-report
+        name: test
         code: |
-          npm run-script test-report
-
-    - script:
-        name: coverage
-        code: |
-          npm run-script coverage
+          npm test
 
 push-release:
   steps:
