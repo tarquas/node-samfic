@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node_modules/.bin/mocha",
     "test-report": "node_modules/.bin/mocha --reporter mochawesome --reporter-options \"reportDir=test-report,reportName=index,reportTitle=SAMFIC Test Report,inlineAssets=true\"",
-    "lint": "export FILES=\"index.js src test\" && node_modules/.bin/eslint $FILES && node_modules/.bin/jsinspect $FILES",
+    "lint": "export FILES=\"index.js src test status\" && node_modules/.bin/eslint $FILES && node_modules/.bin/jsinspect $FILES",
     "coverage": "node_modules/.bin/istanbul cover node_modules/.bin/_mocha"
   },
   "engines": {
@@ -42,5 +42,8 @@
     "jsinspect": "0.8.0",
     "mocha": "3.0.2",
     "mochawesome": "1.5.2"
+  },
+  "dependencies": {
+    "express": "^4.14.0"
   }
 }

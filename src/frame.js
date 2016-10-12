@@ -89,7 +89,7 @@ Frame.finalizer = function* finalizer() {
 };
 
 Frame.processMain = function processMain(...arg) {
-  if (Frame.mainModule !== this) return false;
+  if (!this.forceMain && Frame.mainModule !== this) return false;
   const me = this;
 
   const promise = Co.co(function* mainLauncher() {
