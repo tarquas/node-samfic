@@ -16,14 +16,13 @@ test:
   override:
     - npm run-script lint
     - npm test
-  post:
-    - cf api https://api.ng.bluemix.net
-    - cf auth $BLUEMIX_USER $BLUEMIX_PASSWORD
-    - cf target -o $BLUEMIX_ORG -s $BLUEMIX_SPACE
-    - cf a
 
 deployment:
   production:
     branch: master
     commands:
-      - cf push
+      - cf api https://api.ng.bluemix.net
+      - cf auth $BLUEMIX_USER $BLUEMIX_PASSWORD
+      - cf target -o $BLUEMIX_ORG -s $BLUEMIX_SPACE
+      - cf a
+      - cf push $BLUEMIX_APP
