@@ -35,10 +35,7 @@ Status.npmRunScript = function* npmRunScript(script) {
 
 Status.stay = true;
 
-Status.index = (req, res) => {
-  if (Status.done) return res.end(Status.indexHtml);
-  res.end(Status.waitHtml);
-};
+Status.index = (req, res) => res.end(Status.done ? Status.indexHtml : Status.waitHtml);
 
 Status.main = function* main() {
   const app = Status.app;
