@@ -5,6 +5,8 @@ machine:
     version: 6.1.0
 
 test:
+  - nvm install 6.6.0
+  - nvm use 6.6.0
   - npm run-script lint
   - npm run-script test-report
   - npm run-script coverage
