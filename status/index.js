@@ -13,6 +13,7 @@ Status.app = express();
 Status.initializer = function* initializer() {
   if (!this.server) this.server = new http.Server(this.app);
   if (!Status.indexHtml) Status.indexHtml = yield fsCall.readFile(`${__dirname}/index.html`);
+  if (!Status.waitHtml) Status.waitHtml = yield fsCall.readFile(`${__dirname}/wait.html`);
 };
 
 Status.finalizer = function* finalizer() {
@@ -27,27 +28,25 @@ Status.fileExists = function* fileExists(name) {
 };
 
 Status.npmRunScript = function* npmRunScript(script) {
-  yield new Promise((ok, nok) => {
-    child.exec(`npm run-script ${script}`, (err, stdout, stderr) => {
-      if (err) {
-        console.log(stdout);
-        console.log(stderr);
-        nok(err);
-      } else ok(stdout);
-    });
+  yield new Promise((ok) => {
+    child.exec(`npm run-script ${script}`, {cwd: `${__dirname}/..`}, ok);
   });
 };
 
 Status.stay = true;
 
+Status.index = (req, res) => {
+  if (Status.done) return res.end(Status.indexHtml);
+  res.end(Status.waitHtml);
+};
+
 Status.main = function* main() {
-  const testReportDir = `${__dirname}/../test-report`;
-  const lcovReportDir = `${__dirname}/../coverage/lcov-report`;
-  if (!(yield* Status.fileExists(testReportDir))) yield Status.npmRunScript('test-report');
-  if (!(yield* Status.fileExists(lcovReportDir))) yield Status.npmRunScript('coverage');
   const app = Status.app;
-  app.get('/', (req, res) => res.end(Status.indexHtml));
-  app.use('/test-report', express.static(testReportDir));
-  app.use('/lcov-report', express.static(lcovReportDir));
+  app.get('/', Status.index);
+  app.use('/test-report', express.static(`${__dirname}/../test-report`));
+  app.use('/lcov-report', express.static(`${__dirname}/../coverage/lcov-report`));
   yield Status.server [callbacks]('listen').listen(Status.port);
+
+  yield Status.npmRunScript('test-report-coverage');
+  Status.done = true;
 };

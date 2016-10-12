@@ -5,10 +5,11 @@
   "main": "index.js",
   "scripts": {
     "start": "node status",
+    "lint": "export FILES=\"index.js src test status\" && node_modules/.bin/eslint $FILES && node_modules/.bin/jsinspect $FILES",
     "test": "node_modules/.bin/mocha",
     "test-report": "node_modules/.bin/mocha --reporter mochawesome --reporter-options \"reportDir=test-report,reportName=index,reportTitle=SAMFIC Test Report,inlineAssets=true\"",
-    "lint": "export FILES=\"index.js src test status\" && node_modules/.bin/eslint $FILES && node_modules/.bin/jsinspect $FILES",
-    "coverage": "node_modules/.bin/istanbul cover node_modules/.bin/_mocha"
+    "coverage": "node_modules/.bin/istanbul cover node_modules/.bin/_mocha",
+    "test-report-coverage": "node_modules/.bin/istanbul cover node_modules/.bin/_mocha -- --reporter mochawesome --reporter-options \"reportDir=test-report,reportName=index,reportTitle=SAMFIC Test Report,inlineAssets=true\""
   },
   "engines": {
     "node": ">=6.2.2"
