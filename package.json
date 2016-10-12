@@ -4,6 +4,7 @@
   "description": "Node.js' Scalable Asynchronous Module Functional Inversion of Control",
   "main": "index.js",
   "scripts": {
+    "start": "node status",
     "test": "node_modules/.bin/mocha",
     "test-report": "node_modules/.bin/mocha --reporter mochawesome --reporter-options \"reportDir=test-report,reportName=index,reportTitle=SAMFIC Test Report,inlineAssets=true\"",
     "lint": "export FILES=\"index.js src test status\" && node_modules/.bin/eslint $FILES && node_modules/.bin/jsinspect $FILES",

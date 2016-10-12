@@ -6,8 +6,3 @@ const symbol = require('./src/symbol');
 Frame.Co = Co;
 Frame.Funnel = Funnel;
 Frame.symbol = symbol;
-
-if (require.main === module) {
-  const Status = require('./status'); // eslint-disable-line
-  Status.forceMain = true;
-}
