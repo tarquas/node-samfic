@@ -6,10 +6,10 @@ machine:
   pre:
     - nvm install 6.6.0 && nvm use 6.6.0
 
-general:
-  branches:
-    only:
-      - master
+# general:
+#  branches:
+#    only:
+#      - master
 
 dependencies:
   pre:
@@ -29,7 +29,7 @@ test:
     - cf auth "$BLUEMIX_USER" "$BLUEMIX_PASSWORD"
     - cf target -o "$BLUEMIX_ORG"
     - cf a
-    - if [ "$CI_PULL_REQUEST" ]; then exit 0; fi
+#    - if [ "$CI_PULL_REQUEST" ]; then exit 0; fi
 
 deployment:
   production:
