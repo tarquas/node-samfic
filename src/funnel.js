@@ -30,10 +30,10 @@ Funnel.wrapCall = function* wrapCall(arrayFunnel, values, ...args) {
   const sta = values[Co.status];
   const passArgs = !sta ? args : args.concat(sta.args);
   const context = (sta && sta.context) || this;
-  const ctor = values.constructor;
-  if (ctor === Co.ctorArray) return yield* arrayFunnel.call(context, values, ...passArgs);
+  const ctor = values[Co.type];
+  if (ctor === Co.types.array) return yield* arrayFunnel.call(context, values, ...passArgs);
 
-  if (ctor === Co.ctorObject) {
+  if (ctor === Co.types.object) {
     return yield* Funnel.wrapObject.call(context, arrayFunnel, values, ...passArgs);
   }
 

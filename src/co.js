@@ -4,6 +4,39 @@ const symbol = require('./symbol');
 
 /* eslint complexity: ['error', 9] */
 
+Co.hasown = symbol('hasown', Object.hasOwnProperty);
+Co.type = symbol('type', Object);
+Co.typeName = symbol('typeName', Object);
+Co.types = symbol.globalDef('types', {});
+
+Co.setTypes = (map) => {
+  for (const name in map) {
+    if (map [Co.hasown](name)) {
+      const value = map[name];
+      const ctor = value.constructor;
+      const proto = Object.getPrototypeOf(value);
+      proto[Co.type] = ctor;
+      proto[Co.typeName] = name;
+      Co.types[name] = ctor;
+    }
+  }
+};
+
+Co.setFlags = (map) => {
+  for (const name in map) {
+    if (map [Co.hasown](name)) {
+      const types = map[name];
+      const prop = symbol(name, false);
+      Co[name] = prop;
+
+      for (const type of types) {
+        type[prop] = true;
+        type.prototype[prop] = true;
+      }
+    }
+  }
+};
+
 const echoFunction = function echoFunction(arg) {
   const result = arg;
   return result;
@@ -13,20 +46,25 @@ const echoGenerator = function* echoGenerator(arg) {
   return arg;
 };
 
-Co.isAnyFunction = Symbol('isAnyFunction');
-Co.isPrimitive = Symbol('isPrimitive');
-Co.ctorObject = ({}).constructor;
-Co.ctorArray = [].constructor;
-Co.ctorFunction = echoFunction.constructor;
-Co.ctorGenerator = echoGenerator.constructor;
-Co.ctorIterator = echoGenerator().constructor;
-Co.ctorSymbol = Symbol;
-Co.ctorFunction[Co.isAnyFunction] = true;
-Co.ctorGenerator[Co.isAnyFunction] = true;
-Boolean[Co.isPrimitive] = true;
-Number[Co.isPrimitive] = true;
-String[Co.isPrimitive] = true;
-Date[Co.isPrimitive] = true;
+Co.setTypes({
+  boolean: true,
+  number: 1,
+  string: 'a',
+  date: new Date(),
+  object: {},
+  array: [],
+  function: echoFunction,
+  generator: echoGenerator,
+  iterator: Object.getPrototypeOf(echoGenerator()),
+  symbol: Co.type,
+  promise: new Promise(echoFunction)
+});
+
+Co.setFlags({
+  isPrimitive: [Co.types.boolean, Co.types.number, Co.types.string, Co.types.date],
+  isAnyFunction: [Co.types.function, Co.types.generator],
+  isPromise: [Co.types.promise]
+});
 
 Co.current = symbol('current', null);
 Co.status = symbol('status', null);
@@ -52,13 +90,6 @@ Co.halt = symbol('halt', function halt(reason) {
   return true;
 });
 
-Co.isPromise = symbol.globalDef('isPromise', obj => (
-  obj &&
-  obj.then &&
-  obj.catch &&
-  obj.constructor !== Co.ctorObject
-));
-
 const coLaunchObject = function* coLaunchObject(obj, ...args) {
   const result = {};
 
@@ -67,7 +98,7 @@ const coLaunchObject = function* coLaunchObject(obj, ...args) {
       const v = obj[i];
 
       result[i] = (
-        v && v.constructor === Co.ctorIterator ?
+        v && v[Co.type] === Co.types.iterator ?
         yield* v :
         yield co.call(this, v, ...args)
       );
@@ -82,7 +113,7 @@ const coLaunchArray = function* coLaunchArray(obj, ...args) {
 
   for (const v of obj) {
     result.push(
-      v && v.constructor === Co.ctorIterator ?
+      v && v[Co.type] === Co.types.iterator ?
       yield* v :
       yield co.call(this, v, ...args)
     );
@@ -92,19 +123,19 @@ const coLaunchArray = function* coLaunchArray(obj, ...args) {
 };
 
 const coLaunchCall = function coLaunchCall(value, ...args) {
-  const ctor = value.constructor;
-  if (ctor === Co.ctorFunction || ctor === Co.ctorGenerator) return value.apply(this, args);
-  else if (ctor === Co.ctorArray) return coLaunchArray.call(this, value, ...args);
-  else if (ctor === Co.ctorObject) return coLaunchObject.call(this, value, ...args);
+  if (value[Co.isAnyFunction]) return value.apply(this, args);
+  const ctor = value[Co.type];
+  if (ctor === Co.types.array) return coLaunchArray.call(this, value, ...args);
+  if (ctor === Co.types.object) return coLaunchObject.call(this, value, ...args);
   return value;
 };
 
 const coLaunch = function coLaunch(generator, ...args) {
   const value = generator && coLaunchCall.call(this, generator, ...args);
   if (!value) return {promise: Promise.resolve(value)};
-  const ctor = value.constructor;
-  if (ctor === Co.ctorIterator) return {iterator: value};
-  if (value instanceof Promise) return {promise: value};
+  const ctor = value[Co.type];
+  if (ctor === Co.types.iterator) return {iterator: value};
+  if (ctor === Co.types.promise) return {promise: value};
   return {promise: Promise.resolve(value)};
 };
 
@@ -122,15 +153,15 @@ const coGetStatus = function coGetStatus(value, continuers) {
 const coNext = function coNext(value, continuers) {
   if (!value) return value;
   const status = coGetStatus(value, continuers);
-  const ctor = value.constructor;
+  const ctor = value[Co.type];
   const context = status.context;
   const args = status.args;
-  if (ctor === Co.ctorFunction) return value.call(context, ...args);
-  if (ctor === Co.ctorArray) return coLaunchArray.call(context, value, ...args);
-  if (ctor === Co.ctorObject) return coLaunchObject.call(context, value, ...args);
-  if (ctor === Co.ctorSymbol) return coNextSymbol.call(context, value, ...args);
-  if (ctor === Co.ctorGenerator) return Co.co(value.call(context));
-  if (ctor === Co.ctorIterator) return Co.co(value);
+  if (ctor === Co.types.function) return value.call(context, ...args);
+  if (ctor === Co.types.array) return coLaunchArray.call(context, value, ...args);
+  if (ctor === Co.types.object) return coLaunchObject.call(context, value, ...args);
+  if (ctor === Co.types.symbol) return coNextSymbol.call(context, value, ...args);
+  if (ctor === Co.types.generator) return Co.co(value.call(context));
+  if (ctor === Co.types.iterator) return Co.co(value);
   return value;
 };
 
@@ -165,9 +196,9 @@ Co.co = symbol.globalDef('co', function co(generator, ...args) {
           input = result.value;
 
           checkLoop: while (true) { // eslint-disable-line
-            if (!input || input.constructor[Co.isPrimitive]) continue yieldLoop; // eslint-disable-line
+            if (!input || input[Co.type][Co.isPrimitive]) continue yieldLoop; // eslint-disable-line
 
-            if (input.constructor === Promise) {
+            if (input[Co.type] === Co.types.promise) {
               input = input.then(continuers.onFulfilled, continuers.onRejected);
               break yieldBlock; // eslint-disable-line
             }
@@ -204,9 +235,9 @@ Co.co = symbol.globalDef('co', function co(generator, ...args) {
         input = result.value;
 
         checkLoop: while (true) { // eslint-disable-line
-          if (!input || input.constructor[Co.isPrimitive]) input = Promise.resolve(input);
+          if (!input || input[Co.type][Co.isPrimitive]) input = Promise.resolve(input);
 
-          if (input.constructor === Promise) {
+          if (input[Co.type] === Co.types.promise) {
             input = input.then(continuers.onFulfilled, continuers.onRejected);
             break yieldBlock; // eslint-disable-line
           }

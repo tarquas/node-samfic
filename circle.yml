@@ -6,6 +6,11 @@ machine:
   pre:
     - nvm install 6.6.0 && nvm use 6.6.0
 
+general:
+  branches:
+    only:
+      - master
+
 dependencies:
   pre:
     - curl -v -L -o cf-cli_amd64.deb 'https://cli.run.pivotal.io/stable?release=debian64&source=github'
@@ -15,12 +20,16 @@ dependencies:
 test:
   override:
     - npm run-script lint
-    - npm test
+    - npm run-script test-report-coverage
   post:
+    - cp status/index.html "$CIRCLE_TEST_REPORTS"
+    - mv test-report "$CIRCLE_TEST_REPORTS"
+    - mv coverage/lcov-report "$CIRCLE_TEST_REPORTS"
     - cf api https://api.ng.bluemix.net
     - cf auth "$BLUEMIX_USER" "$BLUEMIX_PASSWORD"
     - cf target -o "$BLUEMIX_ORG"
     - cf a
+    - if [ "$CI_PULL_REQUEST" ]; then exit 0; fi
 
 deployment:
   production:
