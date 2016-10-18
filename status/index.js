@@ -40,8 +40,8 @@ Status.index = (req, res) => res.end(Status.done ? Status.indexHtml : Status.wai
 Status.main = function* main() {
   const app = Status.app;
   app.get('/', Status.index);
-  app.use('/test-report', express.static(`${__dirname}/../test-report`));
-  app.use('/lcov-report', express.static(`${__dirname}/../coverage/lcov-report`));
+  app.use('/.test-report', express.static(`${__dirname}/../test-report`));
+  app.use('/.lcov-report', express.static(`${__dirname}/../coverage/lcov-report`));
   yield Status.server [callbacks]('listen').listen(Status.port);
 
   yield Status.npmRunScript('test-report-coverage');

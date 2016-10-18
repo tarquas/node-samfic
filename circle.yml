@@ -22,9 +22,9 @@ test:
     - npm run-script lint
     - npm run-script test-report-coverage
   post:
-    - cp status/index.html "$CIRCLE_TEST_REPORTS"
-    - mv test-report "$CIRCLE_TEST_REPORTS"
-    - mv coverage/lcov-report "$CIRCLE_TEST_REPORTS"
+    - cp status/index.html "$CIRCLE_TEST_REPORTS/_CLICK-HERE_to-View-Test-and-Coverage-Reports_.html"
+    - mv test-report "$CIRCLE_TEST_REPORTS/.test-report"
+    - mv coverage/lcov-report "$CIRCLE_TEST_REPORTS/.lcov-report"
     - cf api https://api.ng.bluemix.net
     - cf auth "$BLUEMIX_USER" "$BLUEMIX_PASSWORD"
     - cf target -o "$BLUEMIX_ORG"
