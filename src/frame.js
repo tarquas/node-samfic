@@ -38,7 +38,8 @@ Frame.get = function get(mod, ...arg) {
   if (Frame.zombie) return null;
   const submod = Object.create(this);
   submod.super = this;
-  submod.ready = false;
+  submod.readyDefer = Promise.defer();
+  submod.ready = submod.readyDefer.promise;
 
   if (mod) mod.exports = submod;
 
@@ -66,12 +67,13 @@ Frame.processInit = function processInit(...arg) {
   if (Object.hasOwnProperty.call(me, 'wasInit')) return true;
   me.wasInit = true;
   if (me.preload) me.preload();
-  const superReady = me.ready;
+  const superReady = Object.getPrototypeOf(me).ready;
 
-  me.ready = Co.co(function* initLauncher() {
+  Co.co(function* initLauncher() {
     yield superReady;
     yield* Frame.processInitialize.apply(me, arg);
     if (me.postInit) yield me.postInit [Co.context](me) [Co.args](...arg);
+    me.readyDefer.resolve();
     me.ready = true;
     return true;
   });
