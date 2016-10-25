@@ -38,20 +38,19 @@ Frame.get = function get(mod, ...arg) {
   if (Frame.zombie) return null;
   const submod = Object.create(this);
   submod.super = this;
-  submod.readyDefer = Promise.defer();
-  submod.ready = submod.readyDefer.promise;
+  submod.ready = new Promise((readyResolve) => {
+    if (mod) mod.exports = submod;
 
-  if (mod) mod.exports = submod;
+    if (require.main === mod) {
+      Frame.setHandlers(mod);
+      Frame.mainModule = submod;
+      submod.isMain = true;
+    }
 
-  if (require.main === mod) {
-    Frame.setHandlers(mod);
-    Frame.mainModule = submod;
-    submod.isMain = true;
-  }
-
-  setImmediate(function afterDeclarations() {
-    Frame.processInit.apply(submod, arg);
-    Frame.processMain.apply(submod, arg);
+    setImmediate(function afterDeclarations() {
+      Frame.processInit.call(submod, readyResolve, ...arg);
+      Frame.processMain.apply(submod, arg);
+    });
   });
 
   return submod;
@@ -61,7 +60,7 @@ Frame.ready = true;
 
 Frame.singletons = [];
 
-Frame.processInit = function processInit(...arg) {
+Frame.processInit = function processInit(readyResolve, ...arg) {
   if (Frame.zombie) return false;
   const me = this;
   if (Object.hasOwnProperty.call(me, 'wasInit')) return true;
@@ -73,7 +72,7 @@ Frame.processInit = function processInit(...arg) {
     yield superReady;
     yield* Frame.processInitialize.apply(me, arg);
     if (me.postInit) yield me.postInit [Co.context](me) [Co.args](...arg);
-    me.readyDefer.resolve();
+    readyResolve();
     me.ready = true;
     return true;
   });
