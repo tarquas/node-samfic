@@ -62,6 +62,7 @@ Co.setTypes({
 
 Co.setFlags({
   isPrimitive: [Co.types.boolean, Co.types.number, Co.types.string, Co.types.date],
+  isObjectOrArray: [Co.types.object, Co.types.array],
   isAnyFunction: [Co.types.function, Co.types.generator],
   isPromise: [Co.types.promise]
 });

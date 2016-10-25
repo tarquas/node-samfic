@@ -21,6 +21,6 @@ symbol.globalDef = (name, def) => {
   return def;
 };
 
-symbol.newVersion = global.samficVersion && version > samficVersion;
+symbol.newVersion = !global.samficVersion || version > samficVersion;
 
 module.exports = symbol;
