@@ -352,7 +352,7 @@ const pickBy = function pickBy(what, to) {
 
 const pickOne = function pickOne(what, to) {
   const ctor = what[Co.type];
-  if (ctor[Co.isPrimitive]) to[what] = this[what];
+  if (ctor[Co.isPrimitive] && this [Co.hasown](what)) to[what] = this[what];
   else if (ctor === Co.types.function) pickBy.call(this, what, to);
   else if (ctor === Co.types.array) pickArray.call(this, what, to);
   else if (ctor === Co.types.object) pickObject.call(this, what, to);
