@@ -104,17 +104,22 @@ const mapMap = function mapMap(object, to) {
 };
 
 const mapBy = function mapBy(func, to) {
-  const result = to || [];
-
   if (this [Co.type] === Co.types.array) {
+    if (!to) return this.map(func);
+    const result = to;
+
     for (let i = 0; i < this.length; i++) {
       result.push(func(this[i], i, this));
     }
-  } else {
-    for (const i in this) {
-      if (this [Co.hasown](i)) {
-        result.push(func(this[i], i, this));
-      }
+
+    return result;
+  }
+
+  const result = to || [];
+
+  for (const i in this) {
+    if (this [Co.hasown](i)) {
+      result.push(func(this[i], i, this));
     }
   }
 
@@ -464,9 +469,9 @@ const omitsObject = function omitsObject(what) {
 Func.omits = symbol('omits', function omits(...whats) {
   for (const what of whats) {
     if (!what || what[Co.isPrimitive]) delete this[what];
-    else if (what[Co.isFunction]) omitsBy.call(this, what);
-    else if (what[Co.isArray]) omitsArray.call(this, what);
-    else if (what[Co.isObject]) omitsObject.call(this, what);
+    else if (what[Co.type][Co.isFunction]) omitsBy.call(this, what);
+    else if (what[Co.type][Co.isArray]) omitsArray.call(this, what);
+    else if (what[Co.type][Co.isObject]) omitsObject.call(this, what);
   }
 
   return this;
@@ -551,3 +556,85 @@ Func.group = symbol('group', function group(func, to) {
 });
 
 Func.groupBy = symbol('groupBy', 0 [Func.group]);
+
+Func.invert = symbol('invert', function invert() {
+  const result = {};
+
+  for (const key in this) {
+    if (Object.hasOwnProperty.call(this, key)) {
+      result[this[key]] = key;
+    }
+  }
+
+  return result;
+});
+
+Func.cloneDeep = symbol('cloneDeep', function cloneDeep(feedTo) {
+  const isArray = this[Co.type] === Co.types.array;
+  if (!isArray && !Object.getPrototypeOf(this) === Object.prototype) return this;
+  const to = feedTo || (isArray ? [] : {});
+  return to [Func.extendDeep](this);
+});
+
+Func.extendDeep = symbol('extendDeep', function extendDeep(...whats) {
+  for (const what of whats) {
+    for (const key in what) {
+      if (what [Co.hasown](key)) {
+        const value = what[key];
+
+        if (!value) {
+          this[key] = value;
+        } else {
+          const existing = this[key];
+
+          if (
+            !existing || (
+              existing[Co.type] !== Co.types.array &&
+              !Object.getPrototypeOf(existing) === Object.prototype
+            )
+          ) {
+            this[key] = value;
+          } else {
+            this[key] = value[Co.type][Co.isPrimitive] ? value : value [Func.cloneDeep](existing);
+          }
+        }
+      }
+    }
+  }
+
+  return this;
+});
+
+Func.flatten = symbol('flatten', function flatten(feedTo) {
+  const to = [].concat(...this);
+
+  if (feedTo) {
+    feedTo.push(...to);
+    return feedTo;
+  }
+
+  return to;
+});
+
+Func.flattenDeep = symbol('flattenDeep', function flattenDeep(feedTo) {
+  const to = feedTo || [];
+
+  for (const item of this) {
+    if (item[Co.type] === Co.types.array) to.push(...item [Func.flattenDeep]());
+    else to.push(item);
+  }
+
+  return to;
+});
+
+Func.filter = symbol('filter', function filter(what, feedTo) {
+  if (!feedTo && this[Co.type] === Co.types.array) return this.filter(what);
+  const to = feedTo || [];
+
+  if (this[Co.type] === Co.types.object) return this[Co.pick](what, to);
+  // TODO:
+
+  return to;
+});
+
+// TODO: remove, reduce, zip, zipObject, get, set

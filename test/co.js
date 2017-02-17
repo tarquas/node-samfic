@@ -198,13 +198,13 @@ CoTest.waitForDelayHalt = function* waitForDelayHalt() {
   return duration;
 };
 
-CoTest.waitForFastArrayHalt = function* waitForFastArrayHalt() {
+CoTest.waitForArrayHalt = function* waitForArrayHalt() {
   let sum = 0;
 
   let promise;
 
   promise = co(function* arrayHaltTest() { // eslint-disable-line
-    yield* [
+    yield [
       function* step1() {
         sum += 1;
       },
@@ -312,7 +312,7 @@ describe('test co', function testCo() {
   it('should wait for delay', () => co(CoTest.waitForDelay));
   it('should wait for delay via callback', () => co(CoTest.waitForDelayCallback));
   it('should wait for delay until halt', () => co(CoTest.waitForDelayHalt));
-  it('should halt fast waiting for rest array items', () => co(CoTest.waitForFastArrayHalt));
+  it('should halt waiting for rest array items', () => co(CoTest.waitForArrayHalt));
   it('should halt waiting for rest object items', () => co(CoTest.waitForObjectHalt));
   it('wait for iterator should be slower than fast wait for iterator', () => co(CoTest.iterDelegationMustBeFaster));
 });
