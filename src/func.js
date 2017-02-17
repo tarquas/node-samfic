@@ -569,12 +569,11 @@ Func.invert = symbol('invert', function invert() {
   return result;
 });
 
-Func.cloneDeep = symbol('cloneDeep', function cloneDeep() {
-  if (this[Co.isArray] || Object.getPrototypeOf(this) === Object.prototype) {
-    return (this[Co.isArray] ? [] : {}) [Func.extendDeep](this);
-  }
-
-  return this;
+Func.cloneDeep = symbol('cloneDeep', function cloneDeep(feedTo) {
+  const isArray = this[Co.type] === Co.types.array;
+  if (!isArray && !Object.getPrototypeOf(this) === Object.prototype) return this;
+  const to = feedTo || (isArray ? [] : {});
+  return to [Func.extendDeep](this);
 });
 
 Func.extendDeep = symbol('extendDeep', function extendDeep(...whats) {
@@ -582,7 +581,23 @@ Func.extendDeep = symbol('extendDeep', function extendDeep(...whats) {
     for (const key in what) {
       if (what [Co.hasown](key)) {
         const value = what[key];
-        this[key] = value && value [Func.cloneDeep]();
+
+        if (!value) {
+          this[key] = value;
+        } else {
+          const existing = this[key];
+
+          if (
+            !existing || (
+              existing[Co.type] !== Co.types.array &&
+              !Object.getPrototypeOf(existing) === Object.prototype
+            )
+          ) {
+            this[key] = value;
+          } else {
+            this[key] = value[Co.type][Co.isPrimitive] ? value : value [Func.cloneDeep](existing);
+          }
+        }
       }
     }
   }
@@ -591,8 +606,13 @@ Func.extendDeep = symbol('extendDeep', function extendDeep(...whats) {
 });
 
 Func.flatten = symbol('flatten', function flatten(feedTo) {
-  const to = feedTo || [];
-  to.concat(...this);
+  const to = [].concat(...this);
+
+  if (feedTo) {
+    feedTo.push(...to);
+    return feedTo;
+  }
+
   return to;
 });
 
@@ -600,7 +620,7 @@ Func.flattenDeep = symbol('flattenDeep', function flattenDeep(feedTo) {
   const to = feedTo || [];
 
   for (const item of this) {
-    if (item[Co.type] === Co.type.array) to.push(...item [Func.flattenDeep]());
+    if (item[Co.type] === Co.types.array) to.push(...item [Func.flattenDeep]());
     else to.push(item);
   }
 

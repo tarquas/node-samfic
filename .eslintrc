@@ -45,6 +45,7 @@
     "extendDeep": true,
     "fail": true,
     "failsafe": true,
+    "filter": true,
     "flatten": true,
     "flattenDeep": true,
     "fromPairs": true,
