@@ -2,7 +2,7 @@ const Co = module.exports;
 
 const symbol = require('./symbol');
 
-/* eslint complexity: ['error', 9] */
+/* eslint complexity: ['error', 11] */
 
 Co.hasown = symbol('hasown', Object.hasOwnProperty);
 Co.type = symbol('type', Object);
@@ -62,7 +62,10 @@ Co.setTypes({
 
 Co.setFlags({
   isPrimitive: [Co.types.boolean, Co.types.number, Co.types.string, Co.types.date],
+  isObject: [Co.types.object],
+  isArray: [Co.types.array],
   isObjectOrArray: [Co.types.object, Co.types.array],
+  isFunction: [Co.types.function],
   isAnyFunction: [Co.types.function, Co.types.generator],
   isPromise: [Co.types.promise]
 });
@@ -82,12 +85,14 @@ Co.context = symbol('context', function context(arg) {
   return this;
 });
 
-Co.halt = symbol('halt', function halt(reason) {
-  const sta = this[Co.status];
+Co.halt = symbol('halt', function halt(reason, timeout) {
+  const from = this[Co.type] === Co.types.promise ? this : Co.co(this);
+  const sta = from[Co.status];
   if (!sta) return false;
   sta.halted = reason || 'halted';
-  const cur = this[Co.current];
-  if (cur) cur[Co.halt](reason);
+  // sta.haltExpire = process.uptime() + (timeout | 0 || 2);
+  const cur = from[Co.current];
+  if (cur && cur !== from) cur[Co.halt](reason, timeout);
   return true;
 });
 
@@ -166,6 +171,9 @@ const coNext = function coNext(value, continuers) {
   return value;
 };
 
+Co.promises = {};
+Co.nextId = 0;
+
 Co.co = symbol.globalDef('co', function co(generator, ...args) {
   const gotIterator = coLaunch.call(this, generator, ...args);
 
@@ -176,88 +184,87 @@ Co.co = symbol.globalDef('co', function co(generator, ...args) {
   const myStatus = {args, context: this};
   const continuers = {status: myStatus};
 
+  const id = ++Co.nextId;
+
   continuers.onFulfilled = (arg) => {
-    const halted = myStatus.halted;
+    let preInput = null;
     let input = arg;
     let result;
 
-    if (halted) {
-      // error.message = halted;
-      input = Promise.reject(halted);
-    } else {
-      yieldBlock: try { // eslint-disable-line
-        yieldLoop: while (true) { // eslint-disable-line
-          result = iterator.next(input);
-
-          if (result.done) {
-            input = Promise.resolve(result.value);
-            break yieldBlock; // eslint-disable-line
-          }
-
-          input = result.value;
-
-          checkLoop: while (true) { // eslint-disable-line
-            if (!input || input[Co.type][Co.isPrimitive]) continue yieldLoop; // eslint-disable-line
-
-            if (input[Co.type] === Co.types.promise) {
-              input = input.then(continuers.onFulfilled, continuers.onRejected);
-              break yieldBlock; // eslint-disable-line
-            }
-
-            input = coNext(input, continuers);
-          }
-        }
-      } catch (err) {
-        input = Promise.reject(err);
-      }
-    }
-
-    continuers.promise[Co.current] = input;
-    return input;
-  };
-
-  continuers.onRejected = (arg) => {
-    let input = arg;
-    let result;
-    const halted = myStatus.halted;
-
-    if (halted) {
-      // error.message = halted;
-      input = Promise.reject(halted);
-    } else {
-      yieldBlock: try { // eslint-disable-line
-        result = iterator.throw(input);
+    yieldBlock: try { // eslint-disable-line
+      yieldLoop: while (true) { // eslint-disable-line
+        result = myStatus.halted ? iterator.throw(myStatus.halted) : iterator.next(input);
 
         if (result.done) {
-          input = Promise.resolve(result.value);
+          delete Co.promises[id];
+          input = myStatus.halted ? Promise.reject(myStatus.halted) : Promise.resolve(result.value);
           break yieldBlock; // eslint-disable-line
         }
 
         input = result.value;
 
         checkLoop: while (true) { // eslint-disable-line
-          if (!input || input[Co.type][Co.isPrimitive]) input = Promise.resolve(input);
+          if (!input || input[Co.type][Co.isPrimitive]) continue yieldLoop; // eslint-disable-line
 
           if (input[Co.type] === Co.types.promise) {
+            preInput = input;
             input = input.then(continuers.onFulfilled, continuers.onRejected);
             break yieldBlock; // eslint-disable-line
           }
 
           input = coNext(input, continuers);
         }
-      } catch (err) {
-        input = Promise.reject(err);
       }
+    } catch (err) {
+      delete Co.promises[id];
+      input = Promise.reject(err);
     }
 
-    continuers.promise[Co.current] = input;
+    continuers.promise[Co.current] = preInput || input;
     return input;
   };
 
-  continuers.promise = {};
+  continuers.onRejected = (arg) => {
+    let preInput = null;
+    let input = arg;
+    let result;
+
+    yieldBlock: try { // eslint-disable-line
+      result = iterator.throw(myStatus.halted || input);
+
+      if (result.done) {
+        delete Co.promises[id];
+        input = myStatus.halted ? Promise.reject(myStatus.halted) : Promise.resolve(result.value);
+        break yieldBlock; // eslint-disable-line
+      }
+
+      input = result.value;
+
+      checkLoop: while (true) { // eslint-disable-line
+        if (!input || input[Co.type][Co.isPrimitive]) input = Promise.resolve(input);
+
+        if (input[Co.type] === Co.types.promise) {
+          preInput = input;
+          input = input.then(continuers.onFulfilled, continuers.onRejected);
+          break yieldBlock; // eslint-disable-line
+        }
+
+        input = coNext(input, continuers);
+      }
+    } catch (err) {
+      delete Co.promises[id];
+      input = Promise.reject(err);
+    }
+
+    continuers.promise[Co.current] = preInput || input;
+    return input;
+  };
+
+  const pre = continuers.promise = {};
   continuers.promise = continuers.onFulfilled();
-  continuers.promise[Co.current] = continuers.promise;
   continuers.promise[Co.status] = myStatus;
+  continuers.promise[Co.current] = pre[Co.current];
+  Co.promises[id] = continuers.promise;
   return continuers.promise;
 });
 
@@ -284,6 +291,74 @@ Co.delay = symbol.globalDef('delay', function delay(sec) {
   if (myHalt) promise[Co.halt] = myHalt;
   promise[Co.status] = {};
   return promise;
+});
+
+Co.timeout = symbol('timeout', function timeout(sec, message) {
+  // let error = new Error() [errstack](1);
+  const msg = message || 'timeout';
+  const from = this[Co.type] === Co.types.promise ? this : Co.co(this);
+
+  let myHalt;
+  let promise;
+
+  promise = new Promise((ok, nok) => { // eslint-disable-line
+    if (!sec) return setImmediate(() => nok(msg));
+
+    const timer = setTimeout(() => {
+      nok(msg);
+      this [Co.halt](msg);
+    }, sec * 1000);
+
+    from.then((data) => {
+      clearTimeout(timer);
+      ok(data);
+    }).catch((err) => {
+      clearTimeout(timer);
+      nok(err);
+    });
+
+    myHalt = (haltMsg) => {
+      clearTimeout(timer);
+      // error.message = msg || 'halted';
+      nok(haltMsg || 'halted');
+    };
+
+    if (promise) promise[Co.halt] = myHalt;
+  });
+
+  if (myHalt) promise[Co.halt] = myHalt;
+  promise[Co.status] = {};
+  return promise;
+});
+
+Co.failsafe = symbol('failsafe', function failsafe(options) {
+  const from = this[Co.type] === Co.types.promise ? this : Co.co(this);
+  const opts = options || {};
+
+  let myHalt;
+  let promise;
+
+  promise = new Promise((ok, nok) => { // eslint-disable-line
+    from.catch(err => err).then(data => ok(data));
+
+    myHalt = (msg, timeout) => {
+      if (!opts.nohalt) {
+        from [Co.halt](msg, timeout);
+        ok(msg || 'halted');
+      }
+    };
+
+    if (promise) promise[Co.halt] = myHalt;
+  });
+
+  if (myHalt) promise[Co.halt] = myHalt;
+  promise[Co.status] = {};
+  return promise;
+});
+
+Co.nohalt = symbol('nohalt', function nohalt(opts) {
+  const newOpts = Object.assign({}, opts, {nohalt: true});
+  return this [Co.failsafe](newOpts);
 });
 
 Co.callbacks = symbol('callbacks', function callbacks(...methods) {
@@ -334,3 +409,37 @@ Co.callbacks = symbol('callbacks', function callbacks(...methods) {
 
   return context;
 });
+
+Co.shutdownTimeout = 4;
+Co.shutdownMessage = (n, sec) => `[SAMFIC] ${n} coroutines timed out for ${sec} and has been halted`;
+
+Co.shutdown = function* shutdown(reason) {
+  const waitFor = [];
+
+  for (const id in Co.promises) {
+    if (Object.hasOwnProperty.call(Co.promises, id)) {
+      const promise = Co.promises[id];
+      promise [Co.failsafe]();
+      if (!promise.selfShutdown) waitFor.push(promise);
+    }
+  }
+
+  try {
+    for (const pro of waitFor) {
+      pro [Co.halt](reason);
+    }
+
+    yield (
+      Promise.all(waitFor.map(pr => pr [Co.failsafe]()))
+
+      [Co.timeout](
+        Co.shutdownTimeout,
+        Co.shutdownMessage(waitFor.length, Co.shutdownTimeout)
+      )
+
+      [Co.failsafe]()
+    );
+  } catch (err) {
+    console.log('[SAMFIC] Coroutine shutdown failed:', err);
+  }
+};

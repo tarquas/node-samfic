@@ -4,20 +4,32 @@ const Co = require('./co');
 
 Frame.stay = false;
 
-Frame.exit = code => Co.co(function* exit() {
-  Frame.exitCode = code;
-  yield* Frame.shutdown(code);
-  process.exit(Frame.exitCode);
-});
+Frame.exit = (code) => {
+  const exiting = Co.co(function* exit() {
+    Frame.exitCode = code;
+    yield delay();
+    yield* Frame.shutdown(code);
+    process.exit(Frame.exitCode);
+  });
 
-Frame.emergencyExit = () => {
-  console.error();
-  Frame.exit(1);
+  exiting.selfShutdown = true;
+
+  return exiting;
+};
+
+Frame.emergencyExit = (reason) => {
+  Frame.exit(reason);
 };
 
 Frame.exceptionHandler = (err) => {
-  console.error(err.stack || err);
-  Frame.emergencyExit('error', err);
+  console.error('[Critical]', err && (err.stack || err.message || err));
+  Frame.emergencyExit(err);
+};
+
+Frame.haltMain = (reason) => {
+  console.error();
+  if (Frame.mainPromise) Frame.mainPromise [Co.halt](reason);
+  else Frame.emergencyExit(reason);
 };
 
 Frame.setHandlers = () => {
@@ -25,9 +37,9 @@ Frame.setHandlers = () => {
     if (!Frame.zombie) console.error('[SAMFIC] Error: Not clean exit');
   });
 
-  process.on('SIGTERM', () => Frame.emergencyExit('SIGTERM'));
-  process.on('SIGHUP', () => Frame.emergencyExit('SIGHUP'));
-  process.on('SIGINT', () => Frame.emergencyExit('SIGINT'));
+  process.on('SIGTERM', () => Frame.haltMain('SIGTERM'));
+  process.on('SIGHUP', () => Frame.haltMain('SIGHUP'));
+  process.on('SIGINT', () => Frame.haltMain('SIGINT'));
 
   process.on('unhandledException', Frame.exceptionHandler);
 };
@@ -38,7 +50,7 @@ Frame.get = function get(mod, ...arg) {
   if (Frame.zombie) return null;
   const submod = Object.create(this);
   submod.super = this;
-  submod.ready = new Promise((readyResolve) => {
+  submod.ready = new Promise((readyResolve, readyReject) => {
     if (mod) mod.exports = submod;
 
     if (require.main === mod) {
@@ -48,7 +60,7 @@ Frame.get = function get(mod, ...arg) {
     }
 
     setImmediate(function afterDeclarations() {
-      Frame.processInit.call(submod, readyResolve, ...arg);
+      Frame.processInit.call(submod, readyResolve, readyReject, ...arg);
       Frame.processMain.apply(submod, arg);
     });
   });
@@ -60,7 +72,7 @@ Frame.ready = true;
 
 Frame.singletons = [];
 
-Frame.processInit = function processInit(readyResolve, ...arg) {
+Frame.processInit = function processInit(readyResolve, readyReject, ...arg) {
   if (Frame.zombie) return false;
   const me = this;
   if (Object.hasOwnProperty.call(me, 'wasInit')) return true;
@@ -69,12 +81,18 @@ Frame.processInit = function processInit(readyResolve, ...arg) {
   const superReady = Object.getPrototypeOf(me).ready;
 
   Co.co(function* initLauncher() {
-    yield superReady;
-    yield* Frame.processInitialize.apply(me, arg);
-    if (me.postInit) yield me.postInit [Co.context](me) [Co.args](...arg);
-    readyResolve();
-    me.ready = true;
-    return true;
+    try {
+      yield superReady;
+      yield* Frame.processInitialize.apply(me, arg);
+      if (me.postInit) yield me.postInit [Co.context](me) [Co.args](...arg);
+      readyResolve();
+      me.ready = true;
+      return true;
+    } catch (err) {
+      console.log(`[SAMFIC] Module "${me.alias || ''}" initialization failed.`);
+      readyReject(err);
+      return false;
+    }
   });
 
   Frame.singletons.push(me);
@@ -94,13 +112,19 @@ Frame.processMain = function processMain(...arg) {
   const me = this;
 
   const promise = Co.co(function* mainLauncher() {
-    yield me.ready;
-    if (me.main) return yield me.main [Co.context](me) [Co.args](...arg);
-    return me.main;
+    try {
+      yield me.ready;
+      if (me.main) yield me.main [Co.context](me) [Co.args](...arg);
+      Frame.mainPromise = null;
+      if (!me.stay) me.exit();
+    } catch (err) {
+      Frame.mainPromise = null;
+      me.exceptionHandler(err);
+    }
   });
 
-  if (!me.stay) promise.then(me.exit);
-  promise.catch(me.exceptionHandler);
+  promise [Co.failsafe]();
+  Frame.mainPromise = promise;
   return true;
 };
 
@@ -109,7 +133,7 @@ Frame.processInitialize = function* processInitialize() {
   const tree = [];
 
   do {
-    tree.push(cur);
+    tree.unshift(cur);
     cur = cur.super;
   } while (cur);
 
@@ -143,6 +167,8 @@ Frame.finalizerError = (err) => {
 Frame.shutdown = function* shutdown(reason) {
   if (Frame.zombie) return false;
   Frame.zombie = true;
+
+  yield* Co.shutdown('framework shutdown');
 
   yield* (
     Frame.singletons
